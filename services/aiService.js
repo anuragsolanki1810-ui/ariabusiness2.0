@@ -71,26 +71,38 @@ When booking appointments collect:
 IMPORTANT RULES:
 - Keep responses SHORT — under 3 sentences. You are speaking on the phone.
 - Be warm and efficient.
-- When you have ALL required info to book, reply with JSON on its own line:
-  {"action":"book","name":"John","phone":"+91XXXXXXXXXX","service":"Haircut","date":"2025-04-10","time":"14:00","notes":""}
-- For cancellation:
-  {"action":"cancel","phone":"+91XXXXXXXXXX","date":"2025-04-10","time":"14:00"}
-- For reschedule:
-  {"action":"reschedule","phone":"+91XXXXXXXXXX","old_date":"2025-04-10","old_time":"14:00","new_date":"2025-04-11","new_time":"15:00"}
-- ONLY include JSON when you have ALL required fields. Never include partial JSON.
+- When you have ALL required info to book: first say a short natural confirmation OUT LOUD (e.g. "Great, you're booked for Tuesday at 2 PM!"), then on a NEW LINE silently include this JSON wrapped in double square brackets — NEVER speak this part or read the words "action", "book", "name" etc out loud:
+  [[{"action":"book","name":"John","phone":"+91XXXXXXXXXX","service":"Haircut","date":"2025-04-10","time":"14:00","notes":""}]]
+- For cancellation, confirm out loud then silently include:
+  [[{"action":"cancel","phone":"+91XXXXXXXXXX","date":"2025-04-10","time":"14:00"}]]
+- For reschedule, confirm out loud then silently include:
+  [[{"action":"reschedule","phone":"+91XXXXXXXXXX","old_date":"2025-04-10","old_time":"14:00","new_date":"2025-04-11","new_time":"15:00"}]]
+- ONLY include the [[ ]] JSON block when you have ALL required fields. Never include a partial block.
+- Include the [[ ]] block only ONCE — do not repeat it in later messages.
 - Speak in customer's language if they use Hindi or another language.
 - Never say you are an AI unless directly asked.`;
 }
 
 // ── Extract action from AI response ──────────────────────────
-// BUG FIX: previous regex was too greedy, could match wrong content
+// BUG FIX: now primarily looks for the [[ ]] silent-wrapper convention
+// (used so the JSON is never spoken aloud by the voice assistant).
+// Falls back to brace-matching for plain JSON, for backward compatibility.
 function extractAction(text) {
   if (!text) return null;
-  // Match JSON objects that contain "action" key specifically
+
+  // ── Primary: look for [[ ... ]] wrapped JSON ─────────────────
+  const wrapped = text.match(/\[\[([\s\S]*?)\]\]/);
+  if (wrapped) {
+    try {
+      const parsed = JSON.parse(wrapped[1].trim());
+      if (parsed && parsed.action) return parsed;
+    } catch { /* fall through to legacy method below */ }
+  }
+
+  // ── Fallback: legacy brace-matching for plain {"action":...} ──
   const match = text.match(/\{\s*"action"\s*:\s*"[^"]+"/);
   if (!match) return null;
 
-  // Find the full JSON object starting from match position
   const startIdx = text.indexOf(match[0]);
   let braceCount = 0;
   let endIdx = startIdx;
@@ -217,8 +229,9 @@ async function chat(messages, callerPhone, businessId) {
     actionResult = await executeAction(action, callerPhone, businessId);
   }
 
-  // Strip the JSON blob from the spoken reply
+  // Strip the JSON blob (and its [[ ]] wrapper, if present) from the spoken reply
   const cleanReply = reply
+    .replace(/\[\[[\s\S]*?\]\]/g, '')
     .replace(/\{\s*"action"[\s\S]*?\}/g, '')
     .trim();
 
