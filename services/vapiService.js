@@ -60,7 +60,8 @@ Never say you are an AI unless asked. If customer speaks Hindi, reply in Hindi.`
       temperature: 0.7,
     },
     voice: {
-      provider:        'elevenlabs',
+      // BUG FIX: Vapi's API requires '11labs', not 'elevenlabs'
+      provider:        '11labs',
       voiceId:         ELEVENLABS_VOICE_ID,
       stability:       0.5,
       similarityBoost: 0.75,
@@ -132,7 +133,8 @@ When ready to book: {"action":"book","name":"...","phone":"...","service":"...",
         maxTokens: 300,
       },
       voice: {
-        provider:        'elevenlabs',
+        // BUG FIX: Vapi's API requires '11labs', not 'elevenlabs'
+        provider:        '11labs',
         voiceId:         ELEVENLABS_VOICE_ID,
         stability:       0.5,
         similarityBoost: 0.75,
